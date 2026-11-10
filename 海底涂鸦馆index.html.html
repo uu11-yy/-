@@ -1,0 +1,885 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
+<title>Doodle Aquarium V4 · 涂鸦水族馆</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+html,body{width:100vw;height:100vh;overflow:hidden;font-family:Inter, system-ui, -apple-system, "PingFang SC", sans-serif;}
+body{background:#0b182c;color:#fff;cursor:url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20"><circle cx="10" cy="10" r="2" fill="%23fff" opacity="0.7"/></svg>') 10 10, crosshair;}
+#mainCanvas{display:block;width:100vw;height:100vh;}
+
+.bubble-tip{
+    position:absolute;
+    background:rgba(255,255,255,0.92);
+    color:#0f2440;
+    padding:14px 18px;border-radius:22px;
+    box-shadow:0 6px 18px rgba(0,40,80,0.18);
+    pointer-events:none;display:none;z-index:40;
+    max-width:320px;font-size:14px;line-height:1.6;
+}
+.bubble-tip h4{margin-bottom:4px;font-size:16px;}
+.bubble-tip .tag{color:#3478b8;font-size:12px;margin-bottom:6px;}
+
+.bottle-modal{
+    position:fixed;inset:0;background:rgba(0,12,28,0.65);
+    display:none;align-items:center;justify-content:center;z-index:100;
+}
+.bottle-panel{
+    width:min(92vw,520px);background:#fffef9;border-radius:24px;padding:24px;
+    color:#11243c;box-shadow:0 10px 40px rgba(0,0,0,0.25);
+}
+.bottle-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;}
+.bottle-top h2{font-size:22px;font-weight:500;}
+.close-bottle{font-size:26px;cursor:pointer;opacity:0.7;}
+#drawCanvas{width:100%;height:260px;border:1px solid #ddd;border-radius:16px;background:#fff;touch-action:none;}
+.tool-bar{display:flex;gap:8px;flex-wrap:wrap;margin:14px 0;align-items:center;}
+.tool{padding:7px 11px;border-radius:10px;background:#eef6fc;border:none;cursor:pointer;font-size:13px;}
+.tool.active{background:#5298dd;color:#fff;}
+.slider-row{margin:10px 0;display:flex;gap:10px;align-items:center;}
+.slider-row label{font-size:13px;width:70px;}
+.slider-row input[type=range]{flex:1;}
+.text-input{width:100%;padding:9px;border:1px solid #ddd;border-radius:10px;margin:8px 0;font-size:14px;}
+.tag-group{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0;}
+.tag-chip{padding:6px 9px;background:#e8f2fb;border-radius:8px;font-size:12px;cursor:pointer;}
+.tag-chip.selected{background:#5298dd;color:#fff;}
+.bottle-actions{display:flex;gap:10px;margin-top:16px;}
+.bottle-btn{flex:1;padding:12px;border:none;border-radius:12px;font-size:15px;cursor:pointer;}
+.btn-release{background:#428cf7;color:#fff;}
+.btn-save-draft{background:#eef6fc;color:#11243c;}
+
+.shell-modal{
+    position:fixed;inset:0;background:rgba(0,12,28,0.65);
+    display:none;align-items:center;justify-content:center;z-index:100;
+}
+.shell-book{
+    width:min(94vw,700px);height:min(88vh,620px);background:#fffef4;border-radius:20px;padding:24px;
+    color:#18283f;overflow-y:auto;
+}
+.shell-book h2{text-align:center;margin-bottom:18px;font-weight:500;}
+.tab-switch{display:flex;gap:8px;margin-bottom:16px;justify-content:center;}
+.tab{padding:8px 14px;border-radius:10px;background:#e8f2fb;cursor:pointer;font-size:14px;}
+.tab.active{background:#5298dd;color:#fff;}
+.book-grid{display:grid;grid-template-columns:repeat(auto-fill, minmax(180px,1fr));gap:14px;}
+.book-card{background:#fff;padding:12px;border-radius:14px;border:1px solid #e6edf5;}
+.book-card h4{font-size:15px;margin-bottom:4px;}
+.book-card p{font-size:12px;color:#444;line-height:1.5;}
+
+.achievement-toast{
+    position:fixed;left:50%;top:80px;transform:translateX(-50%);
+    background:rgba(255,252,240,0.96);color:#11243c;
+    padding:14px 22px;border-radius:16px;z-index:120;display:none;
+    box-shadow:0 6px 24px rgba(0,0,0,0.2);
+    text-align:center;
+}
+.achievement-toast h4{margin-bottom:4px;}
+
+.hud{position:fixed;top:16px;right:16px;display:flex;flex-direction:column;gap:8px;z-index:30;}
+.hud-btn{width:44px;height:44px;border-radius:50%;background:rgba(255,255,255,0.16);border:none;color:#fff;font-size:18px;cursor:pointer;backdrop-filter:blur(4px);}
+.hud-info{position:fixed;top:16px;left:16px;background:rgba(0,10,22,0.35);backdrop-filter:blur(6px);padding:10px 14px;border-radius:14px;font-size:12px;color:#e4f2ff;z-index:30;}
+.ecology-info{position:fixed;bottom:16px;left:16px;background:rgba(0,10,22,0.35);backdrop-filter:blur(6px);padding:10px 14px;border-radius:14px;font-size:12px;color:#e4f2ff;z-index:30;line-height:1.5;}
+
+.intro-overlay{position:fixed;inset:0;background:#fff;z-index:200;display:flex;align-items:center;justify-content:center;transition:opacity 2.2s ease;}
+.intro-text{font-size:24px;color:#0b182c;text-align:center;line-height:1.8;opacity:0;transition:opacity 1.8s ease;}
+.intro-choose{margin-top:30px;display:flex;gap:18px;justify-content:center;}
+.intro-btn{padding:10px 18px;border-radius:12px;border:1px solid #244872;background:transparent;color:#0b182c;font-size:16px;cursor:pointer;}
+</style>
+</head>
+<body>
+<div class="intro-overlay" id="introOverlay">
+    <div class="intro-text" id="introText">
+        Doodle Aquarium<br>An ecosystem you draw
+        <div class="intro-choose">
+            <button class="intro-btn" onclick="startWorld('dive')">静静潜入</button>
+            <button class="intro-btn" onclick="startWorld('create')">创造生命</button>
+        </div>
+    </div>
+</div>
+<canvas id="mainCanvas"></canvas>
+
+<div class="bubble-tip" id="bubbleTip">
+    <h4 id="tipName"></h4>
+    <div class="tag" id="tipTag"></div>
+    <p id="tipDesc"></p>
+</div>
+
+<div class="achievement-toast" id="achievementToast">
+    <h4 id="achTitle"></h4>
+    <p id="achDesc"></p>
+</div>
+
+<div class="bottle-modal" id="bottleModal">
+    <div class="bottle-panel">
+        <div class="bottle-top">
+            <h2>漂流瓶 · 创作工坊</h2>
+            <span class="close-bottle" onclick="closeBottle()">×</span>
+        </div>
+        <canvas id="drawCanvas"></canvas>
+        <div class="tool-bar">
+            <button class="tool active" data-tool="pencil">炭笔</button>
+            <button class="tool" data-tool="water">水彩</button>
+            <button class="tool" data-tool="glow">荧光笔</button>
+            <button class="tool" data-tool="eraser">橡皮</button>
+        </div>
+        <div class="slider-row">
+            <label>笔触</label>
+            <input type="range" id="sizeSlider" min="2" max="30" value="8">
+        </div>
+        <input class="text-input" id="fishName" placeholder="给这条生命命名">
+        <div class="tag-group" id="habitTags">
+            <span class="tag-chip" data-tag="phototactic">趋光</span>
+            <span class="tag-chip" data-tag="social">群居</span>
+            <span class="tag-chip" data-tag="nocturnal">夜行</span>
+            <span class="tag-chip" data-tag="shy">胆小</span>
+        </div>
+        <div class="bottle-actions">
+            <button class="bottle-btn btn-release" onclick="releaseFish()">释放进海域</button>
+            <button class="bottle-btn btn-save-draft" onclick="saveDraft()">存为草稿</button>
+        </div>
+    </div>
+</div>
+
+<div class="shell-modal" id="shellModal">
+    <div class="shell-book">
+        <h2>贝壳古书 · 物种志</h2>
+        <div class="tab-switch">
+            <div class="tab active" data-tab="native">原生物种</div>
+            <div class="tab" data-tab="mine">我的藏品</div>
+        </div>
+        <div class="book-grid" id="bookGrid"></div>
+    </div>
+</div>
+
+<div class="hud">
+    <button class="hud-btn" id="btnDayNight">☀</button>
+    <button class="hud-btn" id="btnSound">🔊</button>
+    <button class="hud-btn" id="btnBottle">🫙</button>
+    <button class="hud-btn" id="btnShell">🐚</button>
+</div>
+<div class="hud-info" id="hudInfo">浅海 · 珊瑚礁区</div>
+<div class="ecology-info" id="ecoInfo">溶氧：0.75｜藻类：0.12｜珊瑚健康：0.80</div>
+
+<script>
+const canvas = document.getElementById('mainCanvas');
+const ctx = canvas.getContext('2d');
+function resize(){canvas.width=window.innerWidth;canvas.height=window.innerHeight;}
+resize();window.addEventListener('resize',resize);
+
+const DEPTH_ZONE = {
+    REEF:0,    // 浅海珊瑚礁
+    KELP:1,    // 中层海藻林
+    ABYSS:2    // 无光深海
+};
+const ZONE_NAME = ["浅海 · 珊瑚礁区","中层 · 海藻林","无光深海区"];
+const ZONE_COLORS = {
+    REEF:{dayTop:"#96d4f7",dayBot:"#5299ce",nightTop:"#244477",nightBot:"#102240"},
+    KELP:{dayTop:"#346799",dayBot:"#183352",nightTop:"#142844",nightBot:"#0a1828"},
+    ABYSS:{dayTop:"#121a33",dayBot:"#050812",nightTop:"#080c18",nightBot:"#020306"}
+};
+
+let world = {
+    zone:DEPTH_ZONE.REEF,
+    day:true,
+    oxygen:0.75,
+    algae:0.12,
+    plankton:0.2,
+    coralHealth:0.8,
+    soundOn:false,
+    creatures:[],
+    particles:[],
+    food:[],
+    currents:[],
+    corals:[],
+    seaweeds:[],
+    userCreatures:[],
+    drafts:[],
+    achievements:{
+        coralGuardian:false,
+        deepGuide:false,
+        fishHerd:false,
+        glowMaker:false
+    },
+    fishFedCount:0,
+    herdCount:0,
+    moonTide:false,
+    introDone:false
+};
+const STORAGE_KEY = "doodle_aquarium_v4";
+function loadStorage(){
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if(raw){
+        const d = JSON.parse(raw);
+        world.userCreatures = d.userCreatures || [];
+        world.drafts = d.drafts || [];
+        world.oxygen = d.oxygen ?? 0.75;
+        world.algae = d.algae ?? 0.12;
+        world.plankton = d.plankton ?? 0.2;
+        world.coralHealth = d.coralHealth ?? 0.8;
+        world.achievements = d.achievements || world.achievements;
+        world.fishFedCount = d.fishFedCount || 0;
+        world.herdCount = d.herdCount || 0;
+    }
+}
+function saveStorage(){
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({
+        userCreatures:world.userCreatures, drafts:world.drafts,
+        oxygen:world.oxygen, algae:world.algae, plankton:world.plankton, coralHealth:world.coralHealth,
+        achievements:world.achievements, fishFedCount:world.fishFedCount, herdCount:world.herdCount
+    }));
+}
+loadStorage();
+
+function showAchievement(title,desc,key){
+    if(world.achievements[key]) return;
+    world.achievements[key]=true;
+    saveStorage();
+    const toast = document.getElementById('achievementToast');
+    document.getElementById('achTitle').innerText = title;
+    document.getElementById('achDesc').innerText = desc;
+    toast.style.display="block";
+    setTimeout(()=>toast.style.display="none",3200);
+}
+
+const introOverlay = document.getElementById('introOverlay');
+const introText = document.getElementById('introText');
+setTimeout(()=>introText.style.opacity="1", 400);
+function startWorld(mode){
+    world.introDone = true;
+    introOverlay.style.opacity="0";
+    setTimeout(()=>introOverlay.style.display="none",2200);
+    if(mode==='create') openBottle();
+    spawnNativeCreatures();
+    spawnReef();
+}
+
+let audioCtx;
+function initAudio(){
+    if(audioCtx) return;
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+}
+function playBubbleSound(x,y){
+    if(!world.soundOn || !audioCtx) return;
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.connect(gain); gain.connect(audioCtx.destination);
+    osc.type='sine'; osc.frequency.setValueAtTime(600, audioCtx.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(900, audioCtx.currentTime+0.12);
+    gain.gain.setValueAtTime(0.001,audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.0001,audioCtx.currentTime+0.15);
+    osc.start();osc.stop(audioCtx.currentTime+0.15);
+}
+function playFlowSound(){
+    if(!world.soundOn || !audioCtx) return;
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.connect(gain); gain.connect(audioCtx.destination);
+    osc.type='sine'; osc.frequency.setValueAtTime(120, audioCtx.currentTime);
+    gain.gain.setValueAtTime(0.001,audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.0001,audioCtx.currentTime+0.25);
+    osc.start();osc.stop(audioCtx.currentTime+0.25);
+}
+
+class Coral{
+    constructor(x,y){
+        this.x=x;this.y=y;
+        this.phase = Math.random()*Math.PI*2;
+        this.size = 35 + Math.random()*25;
+    }
+    update(dt){
+        this.phase += dt*0.8;
+    }
+    draw(){
+        ctx.save();
+        ctx.translate(this.x,this.y);
+        const h = world.coralHealth;
+        ctx.strokeStyle = h>0.5 ? "#60aa88" : "#c8c8c8";
+        ctx.fillStyle = h>0.5 ? "#82c9aa" : "#e2e2e2";
+        ctx.lineWidth=2;
+        for(let i=0;i<5;i++){
+            const ang = (i/5)*Math.PI*2 + Math.sin(this.phase+i)*0.15;
+            const r = this.size * (0.5 + h*0.4);
+            ctx.beginPath();
+            ctx.moveTo(0,0);
+            ctx.lineTo(Math.cos(ang)*r, Math.sin(ang)*r);
+            ctx.stroke();
+        }
+        ctx.beginPath();
+        ctx.arc(0,0,this.size*0.3,0,Math.PI*2);
+        ctx.fill();
+        ctx.restore();
+    }
+}
+class Seaweed{
+    constructor(x,y){
+        this.x=x;this.y=y;
+        this.phase = Math.random()*Math.PI*2;
+        this.len = 60 + Math.random()*40;
+    }
+    update(dt){
+        this.phase += dt*1.4;
+    }
+    draw(){
+        ctx.save();
+        ctx.translate(this.x,this.y);
+        ctx.strokeStyle="#509977";
+        ctx.lineWidth=3;
+        ctx.beginPath();
+        let cx=0, cy=0;
+        ctx.moveTo(cx,cy);
+        for(let i=0;i<8;i++){
+            const sway = Math.sin(this.phase + i*0.6) * (6 + world.currents.length*4);
+            cy -= this.len/8;
+            cx += sway;
+            ctx.lineTo(cx,cy);
+        }
+        ctx.stroke();
+        ctx.restore();
+    }
+}
+function spawnReef(){
+    world.corals=[];world.seaweeds=[];
+    for(let i=0;i<10;i++){
+        world.corals.push(new Coral(Math.random()*canvas.width, canvas.height - 60 - Math.random()*80));
+    }
+    for(let i=0;i<14;i++){
+        world.seaweeds.push(new Seaweed(Math.random()*canvas.width, canvas.height - 20));
+    }
+}
+
+class Current{
+    constructor(x,y,dx,dy){
+        this.x=x;this.y=y;
+        this.dx=dx;this.dy=dy;
+        this.life=1;
+        this.radius=120;
+    }
+    update(dt){
+        this.life -= dt*0.75;
+    }
+    draw(){
+        ctx.save();
+        ctx.strokeStyle=`rgba(200,230,255,${this.life*0.25})`;
+        ctx.lineWidth=1;
+        ctx.beginPath();
+        ctx.arc(this.x,this.y,this.radius*(1-this.life*0.4),0,Math.PI*2);
+        ctx.stroke();
+        ctx.restore();
+    }
+}
+function spawnCurrent(x,y,dx,dy){
+    world.currents.push(new Current(x,y,dx,dy));
+    playFlowSound();
+}
+
+class Food{
+    constructor(x,y){
+        this.x=x;this.y=y;
+        this.vy=-0.12;
+        this.life=1;
+        this.size=5;
+    }
+    update(dt){
+        this.y += this.vy;
+        this.life -= dt*0.03;
+    }
+    draw(){
+        ctx.fillStyle=`rgba(255,240,180,${this.life})`;
+        ctx.beginPath();
+        ctx.arc(this.x,this.y,this.size,0,Math.PI*2);
+        ctx.fill();
+    }
+}
+function spawnFood(x,y){
+    world.food.push(new Food(x,y));
+}
+
+class Creature{
+    constructor(opt){
+        this.x = opt.x ?? Math.random()*canvas.width;
+        this.y = opt.y ?? Math.random()*canvas.height;
+        this.vx = opt.vx ?? (Math.random()-0.5)*1.2;
+        this.vy = opt.vy ?? (Math.random()-0.5)*1.2;
+        this.species = opt.species;
+        this.name = opt.name;
+        this.info = opt.info;
+        this.tag = opt.tag;
+        this.zone = opt.zone;
+        this.familiar = 0;
+        this.shyness = opt.shyness ?? 0.5;
+        this.habits = opt.habits || [];
+        this.scale = opt.scale ?? 1;
+        this.wobble = Math.random()*Math.PI*2;
+        this.glowColor = opt.glow || null;
+        this.isUser = !!opt.isUser;
+        this.userImg = opt.userImg || null;
+        this.full = 0;
+        this.aggroFood = false;
+    }
+    update(dt){
+        this.wobble += dt*2.2;
+        for(let c of world.currents){
+            const d = Math.hypot(this.x-c.x, this.y-c.y);
+            if(d < c.radius){
+                this.vx += c.dx * 0.0025;
+                this.vy += c.dy * 0.0025;
+            }
+        }
+        let nearestFood = null;
+        let minD = 220;
+        for(let f of world.food){
+            const d = Math.hypot(this.x-f.x, this.y-f.y);
+            if(d < minD){
+                minD = d;
+                nearestFood = f;
+            }
+        }
+        if(nearestFood && this.full < 0.85){
+            this.aggroFood = true;
+            const dx = nearestFood.x - this.x;
+            const dy = nearestFood.y - this.y;
+            this.vx += dx/minD * 0.045;
+            this.vy += dy/minD * 0.045;
+            if(minD < 18){
+                this.full = Math.min(1, this.full + 0.22);
+                nearestFood.life = 0;
+                world.fishFedCount++;
+                if(world.fishFedCount >= 8 && !world.achievements.fishHerd){
+                    showAchievement("鱼群牧者","投喂召集鱼群","fishHerd");
+                }
+            }
+        }else{
+            this.aggroFood = false;
+        }
+        const mx = mouse.x - this.x;
+        const my = mouse.y - this.y;
+        const mDist = Math.hypot(mx,my);
+        if(mDist < 120 && this.shyness>0.3){
+            this.vx -= mx/mDist * this.shyness * 0.06;
+            this.vy -= my/mDist * this.shyness * 0.06;
+        }
+        if(this.x<40) this.vx +=0.03;
+        if(this.x>canvas.width-40) this.vx -=0.03;
+        if(this.y<40) this.vy +=0.03;
+        if(this.y>canvas.height-40) this.vy -=0.03;
+        this.vx *=0.985; this.vy *=0.985;
+        this.x += this.vx; this.y += this.vy;
+        this.full *= 0.996;
+    }
+    draw(){
+        ctx.save();
+        ctx.translate(this.x,this.y);
+        const flip = this.vx<0 ? -1 : 1;
+        ctx.scale(flip,1);
+        if(this.isUser && this.userImg){
+            ctx.drawImage(this.userImg,-40*this.scale,-26*this.scale,80*this.scale,52*this.scale);
+            ctx.restore();
+            return;
+        }
+        this.drawSpecies();
+        ctx.restore();
+    }
+    drawSpecies(){
+        const s = this.scale;
+        const wb = Math.sin(this.wobble);
+        switch(this.species){
+            case "clown":
+                ctx.fillStyle="#ff9955";
+                ctx.beginPath();
+                ctx.ellipse(0,0,22*s,12*s,0,0,Math.PI*2);ctx.fill();
+                ctx.strokeStyle="#fff";ctx.lineWidth=2;
+                ctx.beginPath();ctx.moveTo(-12*s,-10*s);ctx.lineTo(-12*s,10*s);ctx.stroke();
+                ctx.beginPath();ctx.moveTo(4*s,-10*s);ctx.lineTo(4*s,10*s);ctx.stroke();
+                ctx.fillStyle="#111";ctx.arc(-6*s,-3*s,2,0,Math.PI*2);ctx.fill();
+                break;
+            case "seahorse":
+                ctx.fillStyle="#c99966";
+                ctx.beginPath();
+                ctx.moveTo(0,0);
+                ctx.quadraticCurveTo(12*s,-18*s,4*s,-32*s);
+                ctx.quadraticCurveTo(-6*s,-38*s,-12*s,-28*s);
+                ctx.quadraticCurveTo(-10*s,-12*s,0,0);ctx.fill();
+                ctx.fillStyle="#111";ctx.arc(-6*s,-24*s,1.8,0,Math.PI*2);ctx.fill();
+                break;
+            case "shrimp":
+                ctx.fillStyle="#ff8877";
+                ctx.beginPath();ctx.ellipse(0,0,14*s,7*s,0,0,Math.PI*2);ctx.fill();
+                ctx.beginPath();ctx.moveTo(12*s,0);ctx.lineTo(22*s,-6*s);ctx.lineTo(22*s,6*s);ctx.closePath();ctx.fill();
+                ctx.fillStyle="#111";ctx.arc(-4*s,-2*s,1.5,0,Math.PI*2);ctx.fill();
+                break;
+            case "starfish":
+                ctx.fillStyle="#ee8877";
+                ctx.beginPath();
+                for(let i=0;i<5;i++){
+                    const a = (i/5)*Math.PI*2 - Math.PI/2;
+                    const r = 18*s;
+                    const px = Math.cos(a)*r;
+                    const py = Math.sin(a)*r;
+                    i===0 ? ctx.moveTo(px,py) : ctx.lineTo(px,py);
+                }
+                ctx.closePath();ctx.fill();
+                break;
+            case "jelly":
+                ctx.fillStyle="rgba(180,220,255,0.6)";
+                ctx.beginPath();ctx.arc(0,0,24*s,Math.PI,0);ctx.fill();
+                ctx.strokeStyle="rgba(180,220,255,0.5)";ctx.lineWidth=2;
+                for(let i=0;i<5;i++){
+                    const ax = (i-2)*7*s;
+                    ctx.beginPath();ctx.moveTo(ax,0);ctx.quadraticCurveTo(ax+wb*4*s,22*s,ax,36*s);ctx.stroke();
+                }
+                break;
+            case "turtle":
+                ctx.fillStyle="#729966";
+                ctx.beginPath();ctx.ellipse(0,0,32*s,22*s,0,0,Math.PI*2);ctx.fill();
+                ctx.fillStyle="#557744";
+                ctx.beginPath();ctx.ellipse(-28*s,0,12*s,9*s,0,0,Math.PI*2);ctx.fill();
+                ctx.beginPath();ctx.ellipse(18*s,-14*s,14*s,7*s,wb*0.2,0,Math.PI*2);ctx.fill();
+                ctx.beginPath();ctx.ellipse(18*s,14*s,14*s,7*s,-wb*0.2,0,Math.PI*2);ctx.fill();
+                ctx.fillStyle="#111";ctx.arc(-34*s,-3*s,2.5,0,Math.PI*2);ctx.fill();
+                break;
+            case "octopus":
+                ctx.fillStyle="#775599";
+                ctx.beginPath();ctx.arc(0,0,22*s,0,Math.PI*2);ctx.fill();
+                for(let i=0;i<6;i++){
+                    const a = (i/6)*Math.PI - Math.PI/2;
+                    ctx.beginPath();
+                    ctx.moveTo(Math.cos(a)*20*s, Math.sin(a)*20*s);
+                    ctx.quadraticCurveTo(Math.cos(a)*34*s+wb*3, Math.sin(a)*34*s, Math.cos(a)*42*s, Math.sin(a)*44*s);
+                    ctx.lineWidth=5*s;ctx.stroke();
+                }
+                ctx.fillStyle="#fff";ctx.arc(-8*s,-6*s,4,0,Math.PI*2);ctx.fill();
+                ctx.fillStyle="#111";ctx.arc(-8*s,-6*s,2,0,Math.PI*2);ctx.fill();
+                break;
+            case "grouper":
+                ctx.fillStyle="#446677";
+                ctx.beginPath();ctx.ellipse(0,0,30*s,16*s,0,0,Math.PI*2);ctx.fill();
+                ctx.beginPath();ctx.moveTo(24*s,0);ctx.lineTo(36*s,-10*s);ctx.lineTo(36*s,10*s);ctx.closePath();ctx.fill();
+                ctx.fillStyle="#111";ctx.arc(-10*s,-4*s,2.5,0,Math.PI*2);ctx.fill();
+                break;
+            case "flounder":
+                ctx.fillStyle="#b8a888";
+                ctx.beginPath();ctx.ellipse(0,0,28*s,14*s,0,0,Math.PI*2);ctx.fill();
+                ctx.fillStyle="#111";ctx.arc(-8*s,-4*s,2,0,Math.PI*2);ctx.arc(-8*s,4*s,2,0,Math.PI*2);ctx.fill();
+                break;
+            case "squid":
+                ctx.fillStyle="#9977bb";
+                ctx.beginPath();ctx.moveTo(22*s,0);ctx.lineTo(-14*s,-12*s);ctx.lineTo(-14*s,12*s);ctx.closePath();ctx.fill();
+                for(let i=0;i<4;i++){
+                    ctx.beginPath();ctx.moveTo(-14*s,(i-1.5)*6*s);ctx.lineTo(-26*s,(i-1.5)*6*s + wb*2);ctx.lineWidth=3;ctx.stroke();
+                }
+                ctx.fillStyle="#fff";ctx.arc(10*s,-4*s,3,0,Math.PI*2);ctx.fill();
+                ctx.fillStyle="#111";ctx.arc(10*s,-4*s,1.5,0,Math.PI*2);ctx.fill();
+                break;
+            case "angler":
+                ctx.fillStyle="#222233";
+                ctx.beginPath();ctx.ellipse(0,0,30*s,22*s,0,0,Math.PI*2);ctx.fill();
+                ctx.beginPath();ctx.moveTo(-10*s,-20*s);ctx.lineTo(-2*s,-34*s);ctx.lineWidth=3;ctx.stroke();
+                if(this.glowColor){
+                    ctx.fillStyle=this.glowColor;ctx.shadowColor=this.glowColor;ctx.shadowBlur=12;
+                    ctx.beginPath();ctx.arc(-2*s,-36*s,4,0,Math.PI*2);ctx.fill();ctx.shadowBlur=0;
+                }
+                ctx.fillStyle="#fff";ctx.arc(10*s,-6*s,3,0,Math.PI*2);ctx.fill();
+                ctx.fillStyle="#111";ctx.arc(10*s,-6*s,1.5,0,Math.PI*2);ctx.fill();
+                break;
+            case "lantern":
+                ctx.fillStyle="#181828";
+                ctx.beginPath();ctx.ellipse(0,0,18*s,10*s,0,0,Math.PI*2);ctx.fill();
+                if(this.glowColor){
+                    ctx.fillStyle=this.glowColor;ctx.shadowColor=this.glowColor;ctx.shadowBlur=10;
+                    ctx.beginPath();ctx.arc(-4*s,0,4,0,Math.PI*2);ctx.fill();ctx.shadowBlur=0;
+                }
+                ctx.fillStyle="#fff";ctx.arc(6*s,-2*s,2,0,Math.PI*2);ctx.fill();
+                break;
+            default:
+                ctx.fillStyle="#ffddaa";
+                ctx.beginPath();ctx.ellipse(0,0,20*s,10*s,0,0,Math.PI*2);ctx.fill();
+        }
+    }
+    onHover(){
+        const tip = document.getElementById('bubbleTip');
+        document.getElementById('tipName').innerText=this.name;
+        document.getElementById('tipTag').innerText=this.tag;
+        document.getElementById('tipDesc').innerText=this.info;
+        tip.style.display="block";
+    }
+    onLeave(){document.getElementById('bubbleTip').style.display="none";}
+    onClick(){
+        this.familiar = Math.min(1, this.familiar + 0.08);
+        playBubbleSound(this.x,this.y);
+        if(world.coralHealth>0.85 && !world.achievements.coralGuardian){
+            showAchievement("珊瑚守护者","维持珊瑚礁健康","coralGuardian");
+        }
+        if(world.zone===DEPTH_ZONE.ABYSS && !world.achievements.deepGuide){
+            showAchievement("深海引路人","抵达无光深海","deepGuide");
+        }
+    }
+}
+
+function spawnNativeCreatures(){
+    world.creatures=[];
+    const reefList = [
+        {species:"clown",name:"小丑鱼",tag:"雀鲷科",info:"和海葵共生，不怕海葵刺细胞",zone:DEPTH_ZONE.REEF,shyness:0.4},
+        {species:"seahorse",name:"海马",tag:"海龙科",info:"雄性负责孵卵，游动缓慢",zone:DEPTH_ZONE.REEF,shyness:0.6,scale:0.9},
+        {species:"shrimp",name:"清洁虾",tag:"节肢动物",info:"给大鱼清理寄生虫",zone:DEPTH_ZONE.REEF,shyness:0.7,scale:0.7},
+        {species:"starfish",name:"海星",tag:"棘皮动物",info:"断肢可以重新长出新个体",zone:DEPTH_ZONE.REEF,shyness:0.1},
+        {species:"jelly",name:"浅海水母",tag:"钵水母纲",info:"身体九成以上是水",zone:DEPTH_ZONE.REEF,shyness:0.3,scale:1.1}
+    ];
+    const kelpList = [
+        {species:"turtle",name:"绿海龟",tag:"海龟科",info:"古老的海洋爬行动物，长途洄游",zone:DEPTH_ZONE.KELP,shyness:0.2,scale:1.3},
+        {species:"octopus",name:"普通章鱼",tag:"章鱼科",info:"三颗心脏，蓝血，高智商",zone:DEPTH_ZONE.KELP,shyness:0.6,scale:1.1},
+        {species:"grouper",name:"石斑鱼",tag:"鮨科",info:"礁区大型掠食鱼，会变性",zone:DEPTH_ZONE.KELP,shyness:0.4,scale:1.2},
+        {species:"flounder",name:"比目鱼",tag:"鲽形目",info:"趴在海底，双眼长在同一侧",zone:DEPTH_ZONE.KELP,shyness:0.2,scale:1.0},
+        {species:"squid",name:"近海鱿鱼",tag:"枪乌贼科",info:"快速变色，依靠喷水推进",zone:DEPTH_ZONE.KELP,shyness:0.5,scale:1.0}
+    ];
+    const abyssList = [
+        {species:"angler",name:"安康鱼",tag:"鮟鱇科",info:"头顶发光诱饵引诱猎物",zone:DEPTH_ZONE.ABYSS,shyness:0.3,scale:1.2,glow:"#ffdd77"},
+        {species:"lantern",name:"灯笼鱼",tag:"灯笼鱼科",info:"深海集群，自带发光器",zone:DEPTH_ZONE.ABYSS,shyness:0.4,scale:0.8,glow:"#77eeff"}
+    ];
+    [...reefList,...kelpList,...abyssList].forEach(cfg=>{
+        world.creatures.push(new Creature(cfg));
+    })
+    world.userCreatures.forEach(u=>{
+        const img = new Image();
+        img.src = u.dataUrl;
+        img.onload = ()=>{
+            world.creatures.push(new Creature({
+                name:u.name, tag:"你的造物", info:"你手绘的海底生命",
+                zone:u.zone, isUser:true, userImg:img, glow:u.glow
+            }));
+        }
+    })
+}
+
+function spawnParticle(){
+    world.particles.push({
+        x:Math.random()*canvas.width,
+        y:canvas.height+10,
+        vy:-0.4 - Math.random()*1.2,
+        size:2 + Math.random()*5,
+        life:1
+    })
+}
+function updateParticles(dt){
+    for(let i=world.particles.length-1;i>=0;i--){
+        const p = world.particles[i];
+        p.y += p.vy;
+        p.life -= dt*0.08;
+        if(p.life<=0) world.particles.splice(i,1);
+    }
+}
+function drawParticles(){
+    world.particles.forEach(p=>{
+        ctx.fillStyle=`rgba(255,255,255,${p.life*0.4})`;
+        ctx.beginPath();
+        ctx.arc(p.x,p.y,p.size,0,Math.PI*2);ctx.fill();
+    })
+}
+
+const drawModal = document.getElementById('bottleModal');
+const drawCanvas = document.getElementById('drawCanvas');
+const drawCtx = drawCanvas.getContext('2d');
+drawCanvas.width=460; drawCanvas.height=260;
+let drawState = {drawing:false, tool:"pencil", size:8, habits:[], zone:DEPTH_ZONE.REEF};
+document.querySelectorAll('.tool').forEach(t=>t.onclick=()=>{
+    document.querySelectorAll('.tool').forEach(x=>x.classList.remove('active'));
+    t.classList.add('active'); drawState.tool = t.dataset.tool;
+})
+document.querySelectorAll('.tag-chip').forEach(t=>t.onclick=()=>{
+    t.classList.toggle('selected');
+    const tag = t.dataset.tag;
+    if(drawState.habits.includes(tag)) drawState.habits = drawState.habits.filter(x=>x!==tag);
+    else drawState.habits.push(tag);
+})
+document.getElementById('sizeSlider').oninput=e=>drawState.size=+e.target.value;
+function getDrawPos(e){
+    const r = drawCanvas.getBoundingClientRect();
+    const cx = (e.clientX ?? e.touches[0].clientX) - r.left;
+    const cy = (e.clientY ?? e.touches[0].clientY) - r.top;
+    return {x:cx,y:cy};
+}
+drawCanvas.onmousedown = drawCanvas.ontouchstart = e=>{
+    e.preventDefault(); drawState.drawing=true;
+    const p = getDrawPos(e);
+    drawCtx.beginPath(); drawCtx.moveTo(p.x,p.y);
+}
+drawCanvas.onmousemove = drawCanvas.ontouchmove = e=>{
+    if(!drawState.drawing) return;
+    e.preventDefault();
+    const p = getDrawPos(e);
+    drawCtx.lineTo(p.x,p.y);
+    drawCtx.lineWidth=drawState.size;
+    drawCtx.lineCap="round";
+    if(drawState.tool==="pencil") drawCtx.strokeStyle="#222";
+    else if(drawState.tool==="water") drawCtx.strokeStyle="rgba(80,160,220,0.45)";
+    else if(drawState.tool==="glow") drawCtx.strokeStyle="#86f0ff";
+    else if(drawState.tool==="eraser"){drawCtx.globalCompositeOperation="destination-out";drawCtx.lineWidth=drawState.size*1.8;}
+    drawCtx.stroke();
+    drawCtx.globalCompositeOperation="source-over";
+}
+drawCanvas.onmouseup = drawCanvas.onmouseleave = drawCanvas.ontouchend = ()=>drawState.drawing=false;
+function openBottle(){drawModal.style.display="flex";}
+function closeBottle(){drawModal.style.display="none";}
+function releaseFish(){
+    const nameInput = document.getElementById('fishName');
+    const name = nameInput.value.trim() || "无名造物";
+    const dataUrl = drawCanvas.toDataURL("image/png");
+    const newCreature = {name, dataUrl, zone:world.zone, habits:drawState.habits, glow:"#86f0ff"};
+    world.userCreatures.push(newCreature);
+    const img = new Image();
+    img.src = dataUrl;
+    img.onload = ()=>{
+        world.creatures.push(new Creature({
+            name, tag:"你的造物", info:"你亲手绘制的海底生命",
+            zone:world.zone, isUser:true, userImg:img, glow:"#86f0ff"
+        }));
+    }
+    if(newCreature.glow && !world.achievements.glowMaker){
+        showAchievement("荧光造物","创造了发光生命","glowMaker");
+    }
+    saveStorage();
+    closeBottle();
+    drawCtx.clearRect(0,0,drawCanvas.width,drawCanvas.height);
+    nameInput.value="";
+}
+function saveDraft(){
+    world.drafts.push({name:document.getElementById('fishName').value});
+    saveStorage();
+    alert("草稿存入漂流瓶");
+}
+
+const shellModal = document.getElementById('shellModal');
+const bookGrid = document.getElementById('bookGrid');
+document.getElementById('btnShell').onclick = ()=>{
+    shellModal.style.display="flex";
+    renderBook();
+}
+shellModal.onclick = e=>{if(e.target===shellModal) shellModal.style.display="none";}
+function renderBook(){
+    bookGrid.innerHTML="";
+    const allNative = [
+        {name:"小丑鱼",desc:"珊瑚礁区，和海葵共生"},
+        {name:"海马",desc:"珊瑚礁，雄性孵卵"},
+        {name:"清洁虾",desc:"礁区医生，清理寄生虫"},
+        {name:"海星",desc:"礁区底栖，再生能力强"},
+        {name:"浅海水母",desc:"漂浮在珊瑚礁上方"},
+        {name:"绿海龟",desc:"中层海藻林，长途洄游"},
+        {name:"章鱼",desc:"海藻林，高智商拟态"},
+        {name:"石斑鱼",desc:"海藻林大型掠食者"},
+        {name:"比目鱼",desc:"埋在泥沙里伏击"},
+        {name:"近海鱿鱼",desc:"高速变色喷水游动"},
+        {name:"安康鱼",desc:"深海，头顶发光诱饵"},
+        {name:"灯笼鱼",desc:"深海大量集群发光"}
+    ];
+    allNative.forEach(item=>{
+        const card = document.createElement('div');
+        card.className="book-card";
+        card.innerHTML=`<h4>${item.name}</h4><p>${item.desc}</p>`;
+        bookGrid.appendChild(card);
+    })
+    world.userCreatures.forEach(u=>{
+        const card = document.createElement('div');
+        card.className="book-card";
+        card.innerHTML=`<h4>${u.name}</h4><p>你的手绘生命</p>`;
+        bookGrid.appendChild(card);
+    })
+}
+
+document.getElementById('btnDayNight').onclick=()=>{world.day=!world.day;}
+document.getElementById('btnSound').onclick=()=>{
+    initAudio();
+    world.soundOn=!world.soundOn;
+}
+document.getElementById('btnBottle').onclick=openBottle;
+
+const mouse = {x:0,y:0,down:false,lastX:0,lastY:0};
+canvas.addEventListener('mousemove',e=>{
+    mouse.lastX = mouse.x; mouse.lastY = mouse.y;
+    mouse.x=e.clientX;mouse.y=e.clientY;
+    const dx = mouse.x - mouse.lastX;
+    const dy = mouse.y - mouse.lastY;
+    const speed = Math.hypot(dx,dy);
+    if(speed>12 && mouse.down){
+        spawnCurrent(mouse.x,mouse.y,dx/speed,dy/speed);
+    }
+})
+canvas.addEventListener('mousedown',()=>{mouse.down=true;})
+canvas.addEventListener('mouseup',()=>{
+    if(mouse.down){
+        spawnFood(mouse.x,mouse.y);
+    }
+    mouse.down=false;
+})
+canvas.addEventListener('click',e=>{
+    for(let c of world.creatures){
+        const d = Math.hypot(e.clientX - c.x, e.clientY - c.y);
+        if(d < 35){c.onClick();break;}
+    }
+})
+canvas.addEventListener('wheel',e=>{
+    e.preventDefault();
+    if(e.deltaY>0) world.zone = Math.min(2, world.zone+1);
+    else world.zone = Math.max(0, world.zone-1);
+    updateDepthUI();
+})
+function updateDepthUI(){
+    document.getElementById('hudInfo').innerText = ZONE_NAME[world.zone];
+}
+
+function updateEcology(dt){
+    const foodSum = world.food.length;
+    if(foodSum>4){
+        world.algae += dt*0.012;
+        world.oxygen -= dt*0.008;
+    }else{
+        world.algae -= dt*0.004;
+        world.oxygen += dt*0.003;
+    }
+    world.algae = clamp(world.algae,0,1);
+    world.oxygen = clamp(world.oxygen,0,1);
+    world.coralHealth = clamp(world.oxygen - world.algae*0.6,0,1);
+    world.food = world.food.filter(f=>f.life>0);
+    world.currents = world.currents.filter(c=>c.life>0);
+    const h = new Date().getHours();
+    world.moonTide = !world.day && (h>=22 || h<=1);
+    document.getElementById('ecoInfo').innerText =
+        `溶氧：${world.oxygen.toFixed(2)}｜藻类：${world.algae.toFixed(2)}｜珊瑚健康：${world.coralHealth.toFixed(2)} ${world.moonTide?"【月光潮】":""}`;
+}
+function clamp(v,min,max){return Math.max(min,Math.min(max,v));}
+
+function getZoneGradient(){
+    const z = ZONE_COLORS[["REEF","KELP","ABYSS"][world.zone]];
+    const top = world.day ? z.dayTop : z.nightTop;
+    const bot = world.day ? z.dayBot : z.nightBot;
+    const grad = ctx.createLinearGradient(0,0,0,canvas.height);
+    grad.addColorStop(0,top);
+    grad.addColorStop(1,bot);
+    return grad;
+}
+
+let lastT = 0;
+function loop(t){
+    const dt = (t-lastT)/1000; lastT = t;
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+    updateEcology(dt);
+    ctx.fillStyle = getZoneGradient();
+    ctx.fillRect(0,0,canvas.width,canvas.height);
+
+    world.corals.forEach(c=>{c.update(dt);c.draw();});
+    world.seaweeds.forEach(s=>{s.update(dt);s.draw();});
+    world.currents.forEach(c=>{c.update(dt);c.draw();});
+
+    world.food.forEach(f=>{f.update(dt);f.draw();});
+
+    world.creatures.forEach(c=>{c.update(dt);c.draw();});
+
+    updateParticles(dt);
+    drawParticles();
+
+    if(Math.random()<0.02) spawnParticle();
+
+    requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>
